@@ -6,7 +6,7 @@ import {
 import "./App.css";
 import { QRCodeSVG } from 'qrcode.react';
 // ─── API LAYER ────────────────────────────────────────────────────────────────
-const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+const BASE_URL = process.env.REACT_APP_API_URL || "https://ngo-asset.onrender.com/api";
 
 const getToken = () => localStorage.getItem("token");
 const setToken = (t) => localStorage.setItem("token", t);
