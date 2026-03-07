@@ -13,7 +13,14 @@ const reportRoutes = require('./routes/reports');
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "https://ngo-asset-project.vercel.app",
+    /\.vercel\.app$/  // allows ALL vercel preview URLs too
+  ],
+  credentials: true,
+}));
 app.use(express.json());
 
 // Routes
