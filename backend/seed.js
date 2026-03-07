@@ -1,85 +1,130 @@
-const mongoose = require('mongoose');
-require('dotenv').config();
+// ─── SEED SCRIPT ─────────────────────────────────────────────────────────────
+// Run this ONCE to populate your database with test data
+// Usage: node seed.js
+// Make sure your backend server is NOT running when you run this, OR
+// just run: node seed.js from your backend root folder
 
-const User = require('./models/User');
-const Asset = require('./models/Asset');
-const Assignment = require('./models/Assignment');
-const Maintenance = require('./models/Maintenance');
-const Category = require('./models/Category');
+const mongoose = require("mongoose");
 
-const seed = async () => {
-  await mongoose.connect(process.env.MONGO_URI);
-  console.log('Connected to MongoDB');
+// ── Change this to your MongoDB connection string ──
+const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/ngo-assets";
+
+// ─── SCHEMAS (inline so you don't need to import) ─────────────────────────────
+const AssetSchema = new mongoose.Schema({
+  name: String,
+  category: String,
+  serialNumber: String,
+  purchaseDate: String,
+  purchaseCost: Number,
+  condition: String,
+  description: String,
+  location: String,
+  status: { type: String, default: "Available" },
+  assignedTo: String,
+  assetId: String,
+});
+
+const AssignmentSchema = new mongoose.Schema({
+  assetId: mongoose.Schema.Types.ObjectId,
+  assetName: String,
+  assignedTo: String,
+  type: String,
+  role: String,
+  department: String,
+  startDate: Date,       // ← stored as Date, not string
+  returnDate: Date,
+  status: String,
+  notes: String,
+});
+
+const MaintenanceSchema = new mongoose.Schema({
+  assetId: mongoose.Schema.Types.ObjectId,
+  assetName: String,
+  date: String,
+  description: String,
+  technician: String,
+  cost: Number,
+  status: String,
+});
+
+const CategorySchema = new mongoose.Schema({
+  name: String,
+  description: String,
+  icon: String,
+  assetCount: { type: Number, default: 0 },
+});
+
+const Asset = mongoose.model("Asset", AssetSchema);
+const Assignment = mongoose.model("Assignment", AssignmentSchema);
+const Maintenance = mongoose.model("Maintenance", MaintenanceSchema);
+const Category = mongoose.model("Category", CategorySchema);
+
+async function seed() {
+  await mongoose.connect(MONGO_URI);
+  console.log("✅ Connected to MongoDB");
 
   // Clear existing data
-  await Promise.all([
-    User.deleteMany(),
-    Asset.deleteMany(),
-    Assignment.deleteMany(),
-    Maintenance.deleteMany(),
-    Category.deleteMany(),
-  ]);
-  console.log('Cleared existing data');
+  await Asset.deleteMany({});
+  await Assignment.deleteMany({});
+  await Maintenance.deleteMany({});
+  await Category.deleteMany({});
+  console.log("🗑️  Cleared old data");
 
-  // Seed Users
-  await User.create([
-    { email: 'admin@ngo.org', password: 'admin123', role: 'Admin' },
-    { email: 'staff@ngo.org', password: 'staff123', role: 'Staff' },
+  // ── Categories ──
+  const categories = await Category.insertMany([
+    { name: "Electronics",  description: "Laptops, phones, projectors", icon: "💻", assetCount: 3 },
+    { name: "Furniture",    description: "Chairs, desks, tables",       icon: "🪑", assetCount: 2 },
+    { name: "Vehicles",     description: "Cars, bikes, vans",           icon: "🚗", assetCount: 2 },
+    { name: "Medical",      description: "First aid, equipment",        icon: "🏥", assetCount: 1 },
+    { name: "Office",       description: "Printers, stationery",        icon: "📎", assetCount: 2 },
   ]);
-  console.log('✅ Users seeded');
+  console.log("✅ Categories seeded");
 
-  // Seed Categories
-  const categories = await Category.create([
-    { name: 'Electronics', description: 'Computers, tablets, phones', icon: '💻' },
-    { name: 'Furniture', description: 'Desks, chairs, shelves', icon: '🪑' },
-    { name: 'Vehicles', description: 'Cars, motorcycles', icon: '🚗' },
-    { name: 'Medical', description: 'Medical equipment and supplies', icon: '🏥' },
-    { name: 'Office Supplies', description: 'Stationery and office tools', icon: '📎' },
-  ]);
-  console.log('✅ Categories seeded');
-
-  // Seed Assets
+  // ── Assets ──
   const assets = await Asset.insertMany([
-    { assetId: 'AST001', name: 'Dell Latitude Laptop', category: 'Electronics', serialNumber: 'DL-2023-001', status: 'Assigned', assignedTo: 'Alice Johnson', purchaseDate: '2023-01-15', purchaseCost: 1200, condition: 'Good', description: 'Core i5 laptop', location: 'Office A' },
-    { assetId: 'AST002', name: 'HP LaserJet Printer', category: 'Electronics', serialNumber: 'HP-2022-045', status: 'Available', purchaseDate: '2022-06-10', purchaseCost: 450, condition: 'Good', description: 'Network printer', location: 'Office B' },
-    { assetId: 'AST003', name: 'Office Chair (Ergonomic)', category: 'Furniture', serialNumber: 'FC-2021-012', status: 'Available', purchaseDate: '2021-03-20', purchaseCost: 280, condition: 'Fair', description: 'Adjustable height', location: 'Office A' },
-    { assetId: 'AST004', name: 'Toyota Hilux', category: 'Vehicles', serialNumber: 'TH-2020-001', status: 'Maintenance', purchaseDate: '2020-11-05', purchaseCost: 32000, condition: 'Fair', description: 'Field operations vehicle', location: 'Garage' },
-    { assetId: 'AST005', name: 'iPad Pro 11-inch', category: 'Electronics', serialNumber: 'IP-2023-003', status: 'Assigned', assignedTo: 'Bob Smith', purchaseDate: '2023-04-12', purchaseCost: 900, condition: 'Excellent', description: 'Data collection tablet', location: 'Field' },
-    { assetId: 'AST006', name: 'Blood Pressure Monitor', category: 'Medical', serialNumber: 'BP-2022-007', status: 'Available', purchaseDate: '2022-09-01', purchaseCost: 150, condition: 'Good', description: 'Digital BP monitor', location: 'Health Clinic' },
-    { assetId: 'AST007', name: 'Conference Table', category: 'Furniture', serialNumber: 'CT-2019-001', status: 'Available', purchaseDate: '2019-07-15', purchaseCost: 600, condition: 'Good', description: '10-seat conference table', location: 'Meeting Room' },
-    { assetId: 'AST008', name: 'Lenovo ThinkPad', category: 'Electronics', serialNumber: 'LT-2022-018', status: 'Retired', purchaseDate: '2018-02-20', purchaseCost: 950, condition: 'Poor', description: 'Old admin laptop', location: 'Storage' },
-    { assetId: 'AST009', name: 'Portable Generator', category: 'Electronics', serialNumber: 'PG-2021-004', status: 'Maintenance', purchaseDate: '2021-08-30', purchaseCost: 800, condition: 'Fair', description: 'Backup power generator', location: 'Compound' },
-    { assetId: 'AST010', name: 'Wheelchair', category: 'Medical', serialNumber: 'WC-2023-002', status: 'Assigned', assignedTo: 'Community Event', purchaseDate: '2023-02-14', purchaseCost: 350, condition: 'Excellent', description: 'Foldable wheelchair', location: 'Field' },
+    { name: "Dell Laptop",       category: "Electronics", serialNumber: "DL-001", purchaseDate: "2023-01-15", purchaseCost: 800,  condition: "Good",      location: "Office A", status: "Assigned",    assignedTo: "John Doe",   assetId: "ASSET-001" },
+    { name: "HP Projector",      category: "Electronics", serialNumber: "HP-002", purchaseDate: "2023-03-20", purchaseCost: 500,  condition: "Excellent", location: "Office B", status: "Available",   assignedTo: null,         assetId: "ASSET-002" },
+    { name: "iPhone 13",         category: "Electronics", serialNumber: "IP-003", purchaseDate: "2022-11-10", purchaseCost: 900,  condition: "Good",      location: "Field",    status: "Assigned",    assignedTo: "Jane Smith", assetId: "ASSET-003" },
+    { name: "Office Chair",      category: "Furniture",   serialNumber: "CH-001", purchaseDate: "2022-06-01", purchaseCost: 150,  condition: "Fair",      location: "Office A", status: "Available",   assignedTo: null,         assetId: "ASSET-004" },
+    { name: "Standing Desk",     category: "Furniture",   serialNumber: "DS-002", purchaseDate: "2023-07-05", purchaseCost: 400,  condition: "Excellent", location: "Office B", status: "Available",   assignedTo: null,         assetId: "ASSET-005" },
+    { name: "Toyota HiAce Van",  category: "Vehicles",    serialNumber: "VH-001", purchaseDate: "2021-09-15", purchaseCost: 25000,condition: "Good",      location: "Garage",   status: "Assigned",    assignedTo: "Field Team", assetId: "ASSET-006" },
+    { name: "Honda Motorcycle",  category: "Vehicles",    serialNumber: "MC-002", purchaseDate: "2022-04-20", purchaseCost: 3000, condition: "Fair",      location: "Garage",   status: "Maintenance", assignedTo: null,         assetId: "ASSET-007" },
+    { name: "First Aid Kit",     category: "Medical",     serialNumber: "MD-001", purchaseDate: "2023-02-01", purchaseCost: 120,  condition: "Good",      location: "Store",    status: "Available",   assignedTo: null,         assetId: "ASSET-008" },
+    { name: "Canon Printer",     category: "Office",      serialNumber: "PR-001", purchaseDate: "2022-08-10", purchaseCost: 350,  condition: "Good",      location: "Office A", status: "Available",   assignedTo: null,         assetId: "ASSET-009" },
+    { name: "Xerox Copier",      category: "Office",      serialNumber: "XR-002", purchaseDate: "2021-12-20", purchaseCost: 1200, condition: "Fair",      location: "Office B", status: "Retired",     assignedTo: null,         assetId: "ASSET-010" },
   ]);
-  console.log('✅ Assets seeded');
+  console.log("✅ Assets seeded");
 
-  // Seed Assignments
+  // ── Assignments (dates stored as Date objects for monthly chart to work) ──
   await Assignment.insertMany([
-    { assignmentId: 'ASN001', assetId: assets[0]._id, assetName: 'Dell Latitude Laptop', assignedTo: 'Alice Johnson', type: 'Person', role: 'Field Officer', department: 'Operations', startDate: '2024-01-10', returnDate: '2024-06-30', status: 'Active', notes: 'For field data collection' },
-    { assignmentId: 'ASN002', assetId: assets[4]._id, assetName: 'iPad Pro 11-inch', assignedTo: 'Bob Smith', type: 'Person', role: 'Data Analyst', department: 'M&E', startDate: '2024-02-01', returnDate: '2024-07-31', status: 'Active', notes: 'Survey work' },
-    { assignmentId: 'ASN003', assetId: assets[9]._id, assetName: 'Wheelchair', assignedTo: 'Community Outreach 2024', type: 'Event', eventName: 'Community Outreach 2024', location: 'District 5', eventDate: '2024-03-15', startDate: '2024-03-14', returnDate: '2024-03-16', status: 'Returned' },
-    { assignmentId: 'ASN004', assetId: assets[1]._id, assetName: 'HP LaserJet Printer', assignedTo: 'Carol Davis', type: 'Person', role: 'Admin', department: 'Admin', startDate: '2023-09-01', returnDate: '2023-12-31', status: 'Returned' },
-    { assignmentId: 'ASN005', assetId: assets[5]._id, assetName: 'Blood Pressure Monitor', assignedTo: 'Health Camp March', type: 'Event', eventName: 'Health Camp March', location: 'Village A', eventDate: '2024-01-20', startDate: '2024-01-19', returnDate: '2024-01-21', status: 'Overdue', notes: 'Still in field' },
+    { assetId: assets[0]._id, assetName: "Dell Laptop",      assignedTo: "John Doe",    type: "Person", role: "Field Officer",  department: "Operations", startDate: new Date("2025-01-10"), returnDate: new Date("2025-03-10"), status: "Active" },
+    { assetId: assets[2]._id, assetName: "iPhone 13",        assignedTo: "Jane Smith",  type: "Person", role: "Coordinator",    department: "Programs",   startDate: new Date("2025-02-01"), returnDate: new Date("2025-04-01"), status: "Active" },
+    { assetId: assets[5]._id, assetName: "Toyota HiAce Van", assignedTo: "Field Team",  type: "Event",  eventName: "Outreach",  location: "District 5",   startDate: new Date("2025-02-15"), returnDate: new Date("2025-02-20"), status: "Returned" },
+    { assetId: assets[0]._id, assetName: "Dell Laptop",      assignedTo: "Alice Brown", type: "Person", role: "Analyst",        department: "Finance",    startDate: new Date("2025-03-05"), returnDate: new Date("2025-05-05"), status: "Active" },
+    { assetId: assets[1]._id, assetName: "HP Projector",     assignedTo: "Conference",  type: "Event",  eventName: "AGM 2025",  location: "HQ",           startDate: new Date("2025-03-20"), returnDate: new Date("2025-03-21"), status: "Returned" },
+    { assetId: assets[2]._id, assetName: "iPhone 13",        assignedTo: "Bob Lee",     type: "Person", role: "Driver",         department: "Logistics",  startDate: new Date("2025-04-01"), returnDate: new Date("2025-06-01"), status: "Active" },
+    { assetId: assets[5]._id, assetName: "Toyota HiAce Van", assignedTo: "Survey Team", type: "Event",  eventName: "Survey Run",location: "Region A",     startDate: new Date("2025-04-10"), returnDate: new Date("2025-04-15"), status: "Returned" },
+    { assetId: assets[8]._id, assetName: "Canon Printer",    assignedTo: "Carol White", type: "Person", role: "Admin",          department: "Admin",      startDate: new Date("2025-05-01"), returnDate: new Date("2025-07-01"), status: "Active" },
+    { assetId: assets[0]._id, assetName: "Dell Laptop",      assignedTo: "David Osei",  type: "Person", role: "IT Officer",     department: "IT",         startDate: new Date("2025-06-10"), returnDate: new Date("2025-08-10"), status: "Overdue" },
+    { assetId: assets[3]._id, assetName: "Office Chair",     assignedTo: "Eve Adams",   type: "Person", role: "Manager",        department: "HR",         startDate: new Date("2025-06-20"), returnDate: new Date("2025-09-20"), status: "Active" },
   ]);
-  console.log('✅ Assignments seeded');
+  console.log("✅ Assignments seeded");
 
-  // Seed Maintenance
+  // ── Maintenance ──
   await Maintenance.insertMany([
-    { maintenanceId: 'MNT001', assetId: assets[3]._id, assetName: 'Toyota Hilux', date: '2024-03-01', description: 'Engine oil change and tire rotation', technician: 'James Mwangi', cost: 250, status: 'Completed' },
-    { maintenanceId: 'MNT002', assetId: assets[8]._id, assetName: 'Portable Generator', date: '2024-03-10', description: 'Fuel pump replacement', technician: 'Tech Support Ltd', cost: 180, status: 'In Progress' },
-    { maintenanceId: 'MNT003', assetId: assets[3]._id, assetName: 'Toyota Hilux', date: '2024-04-01', description: 'Scheduled 6-month service', technician: 'James Mwangi', cost: 400, status: 'Scheduled' },
-    { maintenanceId: 'MNT004', assetId: assets[7]._id, assetName: 'Lenovo ThinkPad', date: '2023-12-15', description: 'Hard drive failure - data recovered', technician: 'IT Department', cost: 90, status: 'Completed' },
+    { assetId: assets[6]._id, assetName: "Honda Motorcycle", date: "2025-03-01", description: "Engine overhaul",        technician: "AutoFix Ltd",   cost: 400,  status: "Completed" },
+    { assetId: assets[0]._id, assetName: "Dell Laptop",      date: "2025-04-10", description: "Battery replacement",    technician: "TechCare",      cost: 120,  status: "Completed" },
+    { assetId: assets[9]._id, assetName: "Xerox Copier",     date: "2025-05-05", description: "Paper jam & cleaning",   technician: "OfficePro",     cost: 80,   status: "Completed" },
+    { assetId: assets[6]._id, assetName: "Honda Motorcycle", date: "2025-06-15", description: "Tyre replacement",       technician: "AutoFix Ltd",   cost: 200,  status: "In Progress" },
+    { assetId: assets[1]._id, assetName: "HP Projector",     date: "2025-07-01", description: "Bulb replacement",       technician: "TechCare",      cost: 250,  status: "Scheduled" },
   ]);
-  console.log('✅ Maintenance records seeded');
+  console.log("✅ Maintenance seeded");
 
-  console.log('\n🎉 Seeding complete!');
-  console.log('Login credentials:');
-  console.log('  Admin → admin@ngo.org / admin123');
-  console.log('  Staff → staff@ngo.org / staff123');
-  mongoose.disconnect();
-};
+  console.log("\n🎉 Database seeded successfully! Start your server and check the dashboard.");
+  await mongoose.disconnect();
+}
 
 seed().catch((err) => {
-  console.error('Seed error:', err);
-  mongoose.disconnect();
+  console.error("❌ Seed error:", err.message);
+  process.exit(1);
 });

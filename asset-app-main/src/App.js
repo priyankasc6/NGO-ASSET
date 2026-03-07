@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, LineChart, Line,
 } from "recharts";
 import "./App.css";
-
+import { QRCodeSVG } from 'qrcode.react';
 // ─── API LAYER ────────────────────────────────────────────────────────────────
 const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
@@ -63,10 +63,10 @@ const categoriesAPI = {
 };
 
 const reportsAPI = {
-  byCategory: () => request("/reports/assets-by-category"),
-  byStatus: () => request("/reports/assets-by-status"),
+  byCategory: () => request("/reports/by-category"),
+  byStatus: () => request("/reports/by-status"),
   monthlyAssignments: () => request("/reports/monthly-assignments"),
-  topAssigned: () => request("/reports/top-assigned-assets"),
+  topAssigned: () => request("/reports/top-assigned"),
 };
 
 // ─── AUTH CONTEXT ─────────────────────────────────────────────────────────────
@@ -246,35 +246,7 @@ function useToast() {
   return { toasts, addToast: add, removeToast: remove };
 }
 
-function QRCode({ value, size = 128 }) {
-  const seed = value.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  const cells = [];
-  const grid = 21;
-  for (let r = 0; r < grid; r++) {
-    for (let c = 0; c < grid; c++) {
-      const isEdge = (r < 7 && c < 7) || (r < 7 && c >= grid - 7) || (r >= grid - 7 && c < 7);
-      const inner =
-        (r >= 2 && r <= 4 && c >= 2 && c <= 4) ||
-        (r >= 2 && r <= 4 && c >= grid - 5 && c <= grid - 3) ||
-        (r >= grid - 5 && r <= grid - 3 && c >= 2 && c <= 4);
-      const border =
-        ((r === 0 || r === 6) && c < 7) || ((c === 0 || c === 6) && r < 7) ||
-        ((r === 0 || r === 6) && c >= grid - 7) || ((c === grid - 1 || c === grid - 7) && r < 7) ||
-        ((r === grid - 7 || r === grid - 1) && c < 7) ||
-        (r >= grid - 7 && (c === 0 || c === 6));
-      const data = !isEdge && !inner && !border && (((seed * (r + 1) * (c + 1)) % 17) < 9);
-      if (border || inner || data) cells.push({ r, c });
-    }
-  }
-  const cell = size / grid;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {cells.map(({ r, c }) => (
-        <rect key={`${r}-${c}`} x={c * cell} y={r * cell} width={cell} height={cell} fill="black" />
-      ))}
-    </svg>
-  );
-}
+
 
 const Modal = ({ open, onClose, title, children, size = "md" }) => {
   if (!open) return null;
@@ -591,9 +563,11 @@ function LoginPage() {
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function Dashboard({ setPage }) {
   const { assets } = useData();
+  const { user } = useAuth();
   const [reportData, setReportData] = useState({ byCategory: [], byStatus: [], monthly: [] });
 
   useEffect(() => {
+    if (!user) return;
     Promise.all([
       reportsAPI.byCategory(),
       reportsAPI.byStatus(),
@@ -607,7 +581,7 @@ function Dashboard({ setPage }) {
         });
       })
       .catch(console.error);
-  }, []);
+  }, [user]);
 
   const stats = {
     total: assets.length,
@@ -699,7 +673,7 @@ function Dashboard({ setPage }) {
             <XAxis dataKey="month" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} />
             <Tooltip />
-            <Line type="monotone" dataKey="assignments" stroke="#6366f1" strokeWidth={2} dot={{ r: 4 }} />
+            <Line type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2} dot={{ r: 4 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -855,7 +829,7 @@ function AssetList({ setPage, setSelectedAsset, addToast }) {
         {qrAsset && (
           <div className="qr-modal-body">
             <div className="qr-box">
-              <QRCode value={`https://ngo-assets.app/assets/${qrAsset._id}`} size={180} />
+              <QRCodeSVG value={`https://localhost:3000/assets/${qrAsset._id}`} size={180} />
             </div>
             <div className="text-center">
               <p className="font-semibold text-gray-800">{qrAsset.name}</p>
@@ -1091,7 +1065,7 @@ function AssetDetail({ asset, setPage, setSelectedAsset, addToast }) {
       <Modal open={qrOpen} onClose={() => setQrOpen(false)} title="Asset QR Code" size="sm">
         <div className="qr-modal-body">
           <div className="qr-box">
-            <QRCode value={`https://ngo-assets.app/assets/${asset._id}`} size={180} />
+            <QRCodeSVG value={`https://ngo-assets.app/assets/${asset._id}`} size={180} />
           </div>
           <div className="text-center">
             <p className="font-semibold text-gray-800">{asset.name}</p>
@@ -1511,9 +1485,11 @@ function Categories({ addToast }) {
 
 // ─── REPORTS ──────────────────────────────────────────────────────────────────
 function Reports() {
+  const { user } = useAuth();
   const [data, setData] = useState({ byCategory: [], byStatus: [], monthly: [], topAssets: [] });
 
   useEffect(() => {
+    if (!user) return;
     Promise.all([
       reportsAPI.byCategory(),
       reportsAPI.byStatus(),
@@ -1529,7 +1505,7 @@ function Reports() {
         });
       })
       .catch(console.error);
-  }, []);
+  }, [user]);
 
   const STATUS_COLORS = {
     Available: "#10b981", Assigned: "#3b82f6", Maintenance: "#f59e0b", Retired: "#ef4444",
@@ -1581,7 +1557,7 @@ function Reports() {
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Line type="monotone" dataKey="assignments" stroke="#6366f1" strokeWidth={2} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2} dot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>

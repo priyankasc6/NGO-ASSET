@@ -53,6 +53,10 @@ router.post('/', async (req, res) => {
     const assignment = await Assignment.create({
       ...req.body,
       assetName: asset.name,
+      // ✅ FIX: Convert date strings to proper Date objects
+      // This is required for the monthly assignments chart to work
+      startDate:  req.body.startDate  ? new Date(req.body.startDate)  : undefined,
+      returnDate: req.body.returnDate ? new Date(req.body.returnDate) : undefined,
     });
 
     // Update asset status
@@ -68,7 +72,14 @@ router.post('/', async (req, res) => {
 // @desc  Update an assignment (e.g., mark as Returned)
 router.put('/:id', async (req, res) => {
   try {
-    const assignment = await Assignment.findByIdAndUpdate(req.params.id, req.body, {
+    const updateData = {
+      ...req.body,
+      // ✅ FIX: Also convert dates on update
+      ...(req.body.startDate  && { startDate:  new Date(req.body.startDate)  }),
+      ...(req.body.returnDate && { returnDate: new Date(req.body.returnDate) }),
+    };
+
+    const assignment = await Assignment.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
     });

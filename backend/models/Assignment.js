@@ -27,14 +27,16 @@ const assignmentSchema = new mongoose.Schema(
     // Event fields
     eventName: String,
     location: String,
-    eventDate: String,
+    eventDate:{
+      type:Date
+    } ,
     // Common fields
     startDate: {
-      type: String,
+      type: Date,
       required: true,
     },
     returnDate: {
-      type: String,
+      type: Date,
       required: true,
     },
     status: {

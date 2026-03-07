@@ -1,41 +1,34 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const Asset = require('../models/Asset');
-const Assignment = require('../models/Assignment');
-const Maintenance = require('../models/Maintenance');
-const { protect } = require('../middleware/auth');
+const Asset = require("../models/Asset");
+const Assignment = require("../models/Assignment");
+const Maintenance = require("../models/Maintenance");
+const { protect } = require("../middleware/auth");
 
-router.use(protect);
-
-// @route GET /api/reports/summary
-// @desc  Get dashboard summary stats
-router.get('/summary', async (req, res) => {
+// ─── SUMMARY ──────────────────────────────────────────────────────────────────
+router.get("/summary", protect, async (req, res) => {
   try {
-    const [total, available, assigned, maintenance, retired] = await Promise.all([
-      Asset.countDocuments(),
-      Asset.countDocuments({ status: 'Available' }),
-      Asset.countDocuments({ status: 'Assigned' }),
-      Asset.countDocuments({ status: 'Maintenance' }),
-      Asset.countDocuments({ status: 'Retired' }),
-    ]);
+    const totalAssets       = await Asset.countDocuments();
+    const available         = await Asset.countDocuments({ status: "Available" });
+    const assigned          = await Asset.countDocuments({ status: "Assigned" });
+    const maintenance       = await Asset.countDocuments({ status: "Maintenance" });
+    const retired           = await Asset.countDocuments({ status: "Retired" });
+    const totalAssignments  = await Assignment.countDocuments();
+    const activeAssignments = await Assignment.countDocuments({ status: "Active" });
 
-    res.json({
-      success: true,
-      data: { total, available, assigned, maintenance, retired },
-    });
+    res.json({ success: true, data: { totalAssets, available, assigned, maintenance, retired, totalAssignments, activeAssignments } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// @route GET /api/reports/assets-by-category
-// @desc  Count assets grouped by category
-router.get('/assets-by-category', async (req, res) => {
+// ─── BY CATEGORY ──────────────────────────────────────────────────────────────
+router.get("/by-category", protect, async (req, res) => {
   try {
     const data = await Asset.aggregate([
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-      { $project: { name: '$_id', count: 1, _id: 0 } },
-      { $sort: { name: 1 } },
+      { $group: { _id: "$category", count: { $sum: 1 } } },
+      { $project: { _id: 0, name: "$_id", count: 1 } },
+      { $sort: { count: -1 } },
     ]);
     res.json({ success: true, data });
   } catch (err) {
@@ -43,13 +36,13 @@ router.get('/assets-by-category', async (req, res) => {
   }
 });
 
-// @route GET /api/reports/assets-by-status
-// @desc  Count assets grouped by status
-router.get('/assets-by-status', async (req, res) => {
+// ─── BY STATUS ────────────────────────────────────────────────────────────────
+router.get("/by-status", protect, async (req, res) => {
   try {
     const data = await Asset.aggregate([
-      { $group: { _id: '$status', value: { $sum: 1 } } },
-      { $project: { name: '$_id', value: 1, _id: 0 } },
+      { $group: { _id: "$status", value: { $sum: 1 } } },
+      { $project: { _id: 0, name: "$_id", value: 1 } },
+      { $sort: { value: -1 } },
     ]);
     res.json({ success: true, data });
   } catch (err) {
@@ -57,34 +50,51 @@ router.get('/assets-by-status', async (req, res) => {
   }
 });
 
-// @route GET /api/reports/monthly-assignments
-// @desc  Count assignments grouped by month (current year)
-router.get('/monthly-assignments', async (req, res) => {
+// ─── MONTHLY ASSIGNMENTS ──────────────────────────────────────────────────────
+// FIX: Handles both Date objects AND string dates (e.g. "2025-01-10")
+router.get("/monthly-assignments", protect, async (req, res) => {
   try {
-    const year = new Date().getFullYear();
     const data = await Assignment.aggregate([
+      // Convert startDate to a proper Date if it is stored as a string
       {
-        $match: {
-          startDate: { $regex: `^${year}` },
+        $addFields: {
+          startDateParsed: {
+            $cond: {
+              if: { $eq: [{ $type: "$startDate" }, "date"] },
+              then: "$startDate",
+              else: { $dateFromString: { dateString: "$startDate", onError: null, onNull: null } },
+            },
+          },
         },
       },
+      // Drop documents where we couldn't parse the date
+      { $match: { startDateParsed: { $ne: null } } },
       {
         $group: {
-          _id: { $substr: ['$startDate', 5, 2] }, // extract MM
-          assignments: { $sum: 1 },
+          _id: {
+            year:  { $year:  "$startDateParsed" },
+            month: { $month: "$startDateParsed" },
+          },
+          count: { $sum: 1 },
         },
       },
-      { $sort: { _id: 1 } },
+      { $sort: { "_id.year": 1, "_id.month": 1 } },
       {
         $project: {
+          _id: 0,
           month: {
-            $arrayElemAt: [
-              ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-              { $toInt: '$_id' },
+            $concat: [
+              {
+                $arrayElemAt: [
+                  ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+                  { $subtract: ["$_id.month", 1] },
+                ],
+              },
+              " ",
+              { $toString: "$_id.year" },
             ],
           },
-          assignments: 1,
-          _id: 0,
+          count: 1,
         },
       },
     ]);
@@ -94,15 +104,14 @@ router.get('/monthly-assignments', async (req, res) => {
   }
 });
 
-// @route GET /api/reports/top-assigned-assets
-// @desc  Get top assets by number of assignments
-router.get('/top-assigned-assets', async (req, res) => {
+// ─── TOP ASSIGNED ASSETS ──────────────────────────────────────────────────────
+router.get("/top-assigned", protect, async (req, res) => {
   try {
     const data = await Assignment.aggregate([
-      { $group: { _id: '$assetName', count: { $sum: 1 } } },
+      { $group: { _id: "$assetName", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 5 },
-      { $project: { name: '$_id', count: 1, _id: 0 } },
+      { $project: { _id: 0, name: "$_id", count: 1 } },
     ]);
     res.json({ success: true, data });
   } catch (err) {
@@ -110,14 +119,14 @@ router.get('/top-assigned-assets', async (req, res) => {
   }
 });
 
-// @route GET /api/reports/maintenance-costs
-// @desc  Total maintenance costs per asset
-router.get('/maintenance-costs', async (req, res) => {
+// ─── MAINTENANCE COSTS ────────────────────────────────────────────────────────
+router.get("/maintenance-costs", protect, async (req, res) => {
   try {
     const data = await Maintenance.aggregate([
-      { $group: { _id: '$assetName', totalCost: { $sum: '$cost' }, count: { $sum: 1 } } },
+      { $group: { _id: "$assetName", totalCost: { $sum: "$cost" }, count: { $sum: 1 } } },
       { $sort: { totalCost: -1 } },
-      { $project: { name: '$_id', totalCost: 1, count: 1, _id: 0 } },
+      { $limit: 5 },
+      { $project: { _id: 0, name: "$_id", totalCost: 1, count: 1 } },
     ]);
     res.json({ success: true, data });
   } catch (err) {
