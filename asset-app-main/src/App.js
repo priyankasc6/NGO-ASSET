@@ -829,7 +829,7 @@ function AssetList({ setPage, setSelectedAsset, addToast }) {
         {qrAsset && (
           <div className="qr-modal-body">
             <div className="qr-box">
-              <QRCodeSVG value={`https://localhost:3000/assets/${qrAsset._id}`} size={180} />
+              <QRCodeSVG value={`https://ngo-asset-project.vercel.app/assets/${qrAsset._id}`} size={180} />
             </div>
             <div className="text-center">
               <p className="font-semibold text-gray-800">{qrAsset.name}</p>
