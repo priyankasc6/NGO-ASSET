@@ -829,7 +829,7 @@ function AssetList({ setPage, setSelectedAsset, addToast }) {
         {qrAsset && (
           <div className="qr-modal-body">
             <div className="qr-box">
-              <QRCodeSVG value={`https://ngo-asset-project.vercel.app/assets/${qrAsset._id}`} size={180} />
+              <QRCodeSVG value={`${window.location.origin}/assets/${qrAsset._id}`} size={180} />
             </div>
             <div className="text-center">
               <p className="font-semibold text-gray-800">{qrAsset.name}</p>
@@ -1065,7 +1065,7 @@ function AssetDetail({ asset, setPage, setSelectedAsset, addToast }) {
       <Modal open={qrOpen} onClose={() => setQrOpen(false)} title="Asset QR Code" size="sm">
         <div className="qr-modal-body">
           <div className="qr-box">
-            <QRCodeSVG value={`https://your-real-domain.com/assets/${asset._id}`} size={180} />
+            <QRCodeSVG value={`${window.location.origin}/assets/${asset._id}`} size={180} />
           </div>
           <div className="text-center">
             <p className="font-semibold text-gray-800">{asset.name}</p>
