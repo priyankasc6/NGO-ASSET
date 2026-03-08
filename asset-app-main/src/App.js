@@ -1065,7 +1065,7 @@ function AssetDetail({ asset, setPage, setSelectedAsset, addToast }) {
       <Modal open={qrOpen} onClose={() => setQrOpen(false)} title="Asset QR Code" size="sm">
         <div className="qr-modal-body">
           <div className="qr-box">
-            <QRCodeSVG value={`https://ngo-assets.app/assets/${asset._id}`} size={180} />
+            <QRCodeSVG value={`https://ngo-asset-project.vercel.app`} size={180} />
           </div>
           <div className="text-center">
             <p className="font-semibold text-gray-800">{asset.name}</p>
